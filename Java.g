@@ -1,5 +1,4 @@
 // Source of Java grammar: https://github.com/antlr/grammars-v3/blob/master/Java1.6/Java.g
-  
 grammar Java;
 
 options {
@@ -7,11 +6,20 @@ options {
     memoize=true;
 }
 
+@header {
+package OO_PIES1;
+}
+
+@lexer::header {
+package OO_PIES1;
+}
+
+
+
 @members {
 /** A class that encapsulates information about a class such as its name, data members, and methods 
 **/
 private ClassInfo classInfo = new ClassInfo();
-private MethodInfo methodInfo = new MethodInfo();
 public ClassInfo getClassInfo() { return classInfo; }
 String myDataString = "";
 String myMethodString = "";
@@ -20,7 +28,7 @@ String myString2 = "";
 String myString3 = "";
 String classString = "";
 String localVarString = "";
-String modifiers = "";
+
 
 }
 
@@ -78,19 +86,19 @@ classOrInterfaceDeclaration
   
 modifiers  returns [String value] //modified by Ann M
     :
-    (    annotation	{modifiers = ""; }
-    |   'public'	{modifiers += "public ";}
-    |   'protected'	{modifiers += "protected ";}
-    |   'private'	{modifiers += "private ";}
-    |   'static'	{modifiers += "static "; }
-    |   'abstract'	{modifiers += "abstract ";}
-    |   'final'		{modifiers += "final ";}
-    |   'native'	{modifiers += "native ";}
-    |   'synchronized'	{modifiers += "synchronized ";}
-    |   'transient'	{modifiers += "transient ";}
-    |   'volatile'	{modifiers += "volatile ";}
-    |   'strictfp'	{modifiers += "strictfp ";}
-    )* {$value = modifiers;}
+    (    annotation
+    |   'public'	{$value = "public";}
+    |   'protected'	{$value = "protected";}
+    |   'private'	{$value = "private";}
+    |   'static'	{$value = "static";}
+    |   'abstract'	{$value = "abstract";}
+    |   'final'		{$value = "final";}
+    |   'native'	{$value = "native";}
+    |   'synchronized'	{$value = "synchronized";}
+    |   'transient'	{$value = "transien";}
+    |   'volatile'	{$value = "volatile";}
+    |   'strictfp'	{$value = "strictfp";}
+    )*
     ;
 variableModifiers returns [String value] // modified by Ann M
     :   (   'final' {$value = "final";}
@@ -103,12 +111,14 @@ classDeclaration
     |   enumDeclaration
     ;
 normalClassDeclaration // modified by Ann M & Mike M
-    :   modifiers  'class' IDENTIFIER {modifiers = ""; classInfo.setName($IDENTIFIER.text);}
+    :   modifiers  'class' IDENTIFIER {classInfo.setName($IDENTIFIER.text);}
         (typeParameters
         )?
-        ('extends' type {classInfo.addAncestor($type.text);classInfo.setPlus(" extends " + $type.text);}
+        ('extends' et=type {classInfo.addAncestor($et.text);}
         )?
-        ('implements' typeList {classInfo.setPlus(classInfo.getPlus()+" implements "+$typeList.text);}
+        ('implements' ih=type {classInfo.addImplement($ih.text);}
+        	(',' in=type {classInfo.addImplement($in.text);}
+        	)*
         )?            
         classBody
     ;
@@ -208,54 +218,57 @@ classBodyDeclaration
     |   ('static'
         )? 
         block
-    |   memberDecl {modifiers = "";}
+    |   memberDecl
     ;
 memberDecl // modified by Ann M
-    :    fieldDeclaration { modifiers = ""; String lines[] = myDataString.split("\\r?\\n"); for(int i = 0; i < lines.length; ++i) classInfo.addDataMember(lines[i]);}
-    |    methodDeclaration {modifiers = ""; classInfo.addMethod(methodInfo);}
+    :    fieldDeclaration { String lines[] = myDataString.split("\\r?\\n"); for(int i = 0; i < lines.length; ++i) classInfo.addDataMember(lines[i]);}
+    |    methodDeclaration {classInfo.addMethod(myMethodString);}
     |    classDeclaration
     |    interfaceDeclaration
     ;
+
+
 methodDeclaration returns [String value] //modified by Ann M
     :
         /* For constructor, return type is null, name is 'init' */
-         modifiers {methodInfo = new MethodInfo(); modifiers = ""; String mods[] = $modifiers.value.split(" "); for(int i = 0; i < mods.length; ++i){methodInfo.addModifier(mods[i]);}}
-        (typeParameters {}
+         modifiers {myMethodString = $modifiers.value; myMethodString += " ";}
+        (typeParameters {myMethodString += $typeParameters.value; myMethodString += " ";}
         )?
-        IDENTIFIER {methodInfo.setName($IDENTIFIER.text); methodInfo.setReturnType("constructor");}
-        e=formalParameters {myString = ""; myString2 = ""; myString3 = ""; if($e.value != "")methodInfo.addParameter($e.value);}
+        IDENTIFIER {classInfo.addMethodCall($IDENTIFIER.text);myMethodString += $IDENTIFIER.text;}
+        formalParameters {myMethodString += $formalParameters.value; $value = myMethodString;}
         ('throws' qualifiedNameList
         )?
         '{' 
-        (explicitConstructorInvocation
+        (explicitConstructorInvocation 
         )?
-        (blockStatement
+        (blockStatement {classInfo.addToAllMethodCalls(classInfo.getMethodCalls()); classInfo.emptyMethodCalls();}
         )*
-        '}' {}
-    |   modifiers {methodInfo = new MethodInfo(); modifiers = ""; String mods[] = $modifiers.value.split(" "); for(int i = 0; i < mods.length; ++i){methodInfo.addModifier(mods[i]);}}
-        (typeParameters {}
+        '}'
+    |   modifiers {myMethodString = $modifiers.value; myMethodString += " ";}
+        (typeParameters {myMethodString += $typeParameters.value; myMethodString += " ";}
         )?
-        (type 	{methodInfo.setReturnType($type.value);}
-        |   'void'	{methodInfo.setReturnType("void");}
+        (type   {myMethodString += $type.value; myMethodString += " ";}
+        |   'void'  {myMethodString += "void ";}
         )
-        IDENTIFIER {methodInfo.setName($IDENTIFIER.text);}
-        f=formalParameters  {myString = ""; myString2 = ""; myString3 = ""; if($f.value != "")methodInfo.addParameter($f.value);}
+        IDENTIFIER {classInfo.addMethodCall($IDENTIFIER.text); myMethodString += $IDENTIFIER.text;} 
+        formalParameters  {myMethodString += $formalParameters.value;}
         ('[' ']'
         )*
-        ('throws' qualifiedNameList
+        ('throws' qualifiedNameList 
         )?            
         (        
-            block
+            block {classInfo.addToAllMethodCalls(classInfo.getMethodCalls()); classInfo.emptyMethodCalls();}
         |   ';' 
         ) {$value = myMethodString;}
     ;
+    
 fieldDeclaration returns [String value] // modified by: Ann M
-    :   modifiers {if($modifiers.value != null) myDataString = $modifiers.value; } 
-        type	  {if($type.value != null) myDataString += $type.value.trim(); }
-        e=variableDeclarator {if($e.value != null) myDataString += " " + $e.value.trim();}
-        (',' f=variableDeclarator	{myDataString += "\n"; if($modifiers.value != null) myDataString += $modifiers.value; 
+    :   modifiers {if($modifiers.value != null) myDataString = $modifiers.value + " "; } 
+        type	  {if($type.value != null) myDataString += $type.value; }
+        e=variableDeclarator {if($e.value != null) myDataString += " " + $e.value;}
+        (',' f=variableDeclarator	{myDataString += "\n"; if($modifiers.value != null) myDataString += $modifiers.value + " "; 
         				if($type.value != null) myDataString += $type.value + " "; 
-        				if($f.value != null) myDataString += $f.value.trim();}
+        				if($f.value != null) myDataString += $f.value;}
         )*				{$value = myDataString;}
         ';'
     ;
@@ -351,17 +364,27 @@ qualifiedNameList
         )*
     ;
 formalParameters returns [String value] // modified by Ann M
-    :   '(' {}
-        (formalParameterDecls {myString = ""; if($formalParameterDecls.value != null) myString += $formalParameterDecls.value; classInfo.addFormalParameters($formalParameterDecls.value);}
+    :   '(' {myString = "(";}
+        (formalParameterDecls {if($formalParameterDecls.value != null) myString += $formalParameterDecls.value; classInfo.addFormalParameters($formalParameterDecls.value);}
         )? 
-        ')'{$value = myString;}
+        ')'{myString += ")"; $value = myString;}
     ;
+    
+functionParameters //modified by Amish M
+	: ((IDENTIFIER || INTLITERAL) ',')* (IDENTIFIER || INTLITERAL)
+	|| noParameters
+	;
+
+noParameters
+	:	
+	;
+	
 formalParameterDecls returns [String value] // modified by Ann M
     :   ellipsisParameterDecl
-    |   e=normalParameterDecl {myString2 = ""; if($e.value != null) myString2 = $e.value;}
+    |   e=normalParameterDecl {if($e.value != null) myString2 = $e.value;}
         (',' f=normalParameterDecl {myString2 += ", "; if($f.value != null) myString2 += $f.value;}
         )*	{$value = myString2;}
-    |   (g=normalParameterDecl	{myString2 = ""; if($g.value != null) myString2 += $g.value;}
+    |   (g=normalParameterDecl	{if($g.value != null) myString2 += $g.value;}
         ','	{myString2 += ", ";}
         )+ 	{$value = myString2;}
         ellipsisParameterDecl
@@ -419,7 +442,7 @@ elementValuePairs
         )*
     ;
 elementValuePair 
-    :   IDENTIFIER '=' elementValue
+    :  IDENTIFIER '=' elementValue 
     ;
 elementValue 
     :   conditionalExpression
@@ -497,12 +520,33 @@ staticBlock returns [JCBlock tree]
     ;
 */
 blockStatement 
-    :   localVariableDeclarationStatement {String lines[] = $localVariableDeclarationStatement.value.split("\\r?\\n"); for(int i = 0; i < lines.length; ++i) {classInfo.addLocalVariable(lines[i]); methodInfo.addLocal(lines[i]);}}
-    |   classOrInterfaceDeclaration
+    :   localVariableDeclarationStatement {String lines[] = $localVariableDeclarationStatement.value.split("\\r?\\n"); for(int i = 0; i < lines.length; ++i) classInfo.addLocalVariable(lines[i]);}
+    |   function_statement
+    |   classOrInterfaceDeclaration 
     |   statement
     ;
+   
+function_statement
+	:	
+	function_call ';'
+	;
+
+
+system_call //Modified by Amish M
+	:	
+	a='System.out.println' '(' STRINGLITERAL ')'  
+	|| 'System.out.println' '(' function_call ')' 
+	;
+
+function_call //Modified by Amish M
+	: a=IDENTIFIER '.' b=IDENTIFIER '(' functionParameters ')' {classInfo.addMethodCall($a.text + '.' + $b.text);}
+	|| a=IDENTIFIER '(' functionParameters ')' {classInfo.addMethodCall($a.text);}
+	|| ('super.' || 'this.') a=IDENTIFIER '(' functionParameters ')'  {classInfo.addMethodCall($a.text);}
+	 ;
+	
+	
 localVariableDeclarationStatement returns [String value]
-    :   localVariableDeclaration {$value = $localVariableDeclaration.value;}
+    :   localVariableDeclaration {$value = $localVariableDeclaration.value; }
         ';'
     ;
 localVariableDeclaration returns [String value]
@@ -512,20 +556,19 @@ localVariableDeclaration returns [String value]
         )* {$value = localVarString;}
     ;
 statement 
-    :   block
-            
+    :   block       
     |   ('assert'
         )
         expression (':' expression)? ';'
     |   'assert'  expression (':' expression)? ';'            
-    |   'if' parExpression statement ('else' statement)?          
+    |   'if' parExpression statement ('else' statement)?      
     |   forstatement
     |   'while' parExpression statement
     |   'do' statement 'while' parExpression ';'
     |   trystatement
     |   'switch' parExpression '{' switchBlockStatementGroups '}'
     |   'synchronized' parExpression block
-    |   'return' (expression )? ';'
+    |   'return' (expression)? ';' 
     |   'throw' expression ';'
     |   'break'
             (IDENTIFIER
@@ -598,11 +641,15 @@ expressionList
         (',' expression
         )*
     ;
-expression 
-    :   conditionalExpression
-        (assignmentOperator expression
-        )?
+expression //Modified by Amish M
+    :  
+    function_call
+    || system_call 
+    ||(IDENTIFIER ('*'||'/'||'+'||'-'))* function_call 
+    || (INTLITERAL ('*'||'/'||'+'||'-'))* function_call
+    || e=conditionalExpression (assignmentOperator expression)?
     ;
+    
 assignmentOperator 
     :   '='
     |   '+='
@@ -785,10 +832,10 @@ selector
     |   innerCreator
     |   '[' expression ']'
     ;
-creator 
-    :   'new' nonWildcardTypeArguments classOrInterfaceType classCreatorRest
-    |   'new' classOrInterfaceType classCreatorRest
-    |   arrayCreator
+creator //modified by Amish M
+    :   'new' nonWildcardTypeArguments et=type classCreatorRest {classInfo.addMethodCall($et.text);}
+    |   'new' et=type classCreatorRest {classInfo.addMethodCall($et.text);}
+        |   arrayCreator
     ;
 arrayCreator 
     :   'new' createdName
